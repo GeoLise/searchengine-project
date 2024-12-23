@@ -14,3 +14,4 @@ import java.util.List;
 public class SitesList {
     private List<Site> sites;
 }
+

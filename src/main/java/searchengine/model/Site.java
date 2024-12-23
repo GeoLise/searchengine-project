@@ -1,17 +1,20 @@
 package searchengine.model;
 
 
-import lombok.Getter;
-import lombok.Setter;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import lombok.*;
 
 import javax.persistence.*;
-import java.util.Date;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Setter
+@ToString
 @Entity
 @Table(name = "site")
-public class site {
+public class Site {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
@@ -21,7 +24,7 @@ public class site {
     private SiteStatus status;
 
     @Column(name = "status_time")
-    private Date statusTime;
+    private LocalDateTime statusTime;
 
     @Column(name = "last_error", columnDefinition = "text")
     private String lastError;
@@ -29,4 +32,11 @@ public class site {
     private String url;
 
     private String name;
+
+    @OneToMany(mappedBy = "site",
+            fetch = FetchType.LAZY,
+            cascade = CascadeType.ALL)
+    private List<Lemma> lemmas;
+
 }
+

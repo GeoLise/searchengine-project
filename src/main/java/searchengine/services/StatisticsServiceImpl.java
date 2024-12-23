@@ -1,25 +1,22 @@
 package searchengine.services;
 
 import lombok.RequiredArgsConstructor;
-import org.apache.catalina.mapper.Mapper;
-import org.apache.commons.lang3.StringUtils;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.select.Elements;
 import org.springframework.stereotype.Service;
-import searchengine.config.Site;
+import searchengine.dao.LemmaDao;
+import searchengine.dao.PageDao;
+import searchengine.model.Lemma;
+import searchengine.model.Page;
+import searchengine.model.Site;
 import searchengine.config.SitesList;
+import searchengine.dao.SiteDao;
 import searchengine.dto.statistics.DetailedStatisticsItem;
 import searchengine.dto.statistics.StatisticsData;
 import searchengine.dto.statistics.StatisticsResponse;
 import searchengine.dto.statistics.TotalStatistics;
 
-import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +24,10 @@ public class StatisticsServiceImpl implements StatisticsService {
 
     private final Random random = new Random();
     private final SitesList sites;
+    private final SiteDao siteRepository;
+    private final PageDao pageRepository;
+    private final LemmaDao lemmaRepository;
+
 
     @Override
     public StatisticsResponse getStatistics() {
@@ -37,29 +38,35 @@ public class StatisticsServiceImpl implements StatisticsService {
                 ""
         };
 
+        List<Site> siteList = siteRepository.findAll();
+        List<Page> pageList = pageRepository.findAll();
+        List<Lemma> lemmaList = lemmaRepository.findAll();
+
+
         TotalStatistics total = new TotalStatistics();
-        total.setSites(sites.getSites().size());
+        total.setSites(siteList.size());
+        total.setPages(pageList.size());
+        total.setLemmas(lemmaList.size());
         total.setIndexing(true);
 
+
+
         List<DetailedStatisticsItem> detailed = new ArrayList<>();
-        List<Site> sitesList = sites.getSites();
-        for(int i = 0; i < sitesList.size(); i++) {
-            Site site = sitesList.get(i);
+        for(int i = 0; i < siteList.size(); i++) {
+            Site site = siteList.get(i);
             DetailedStatisticsItem item = new DetailedStatisticsItem();
             item.setName(site.getName());
             item.setUrl(site.getUrl());
-            int pages = random.nextInt(1_000);
-            int lemmas = pages * random.nextInt(1_000);
-            item.setPages(pages);
-            item.setLemmas(lemmas);
-            item.setStatus(statuses[i % 3]);
-            item.setError(errors[i % 3]);
-            item.setStatusTime(System.currentTimeMillis() -
-                    (random.nextInt(10_000)));
-            total.setPages(total.getPages() + pages);
-            total.setLemmas(total.getLemmas() + lemmas);
+            item.setPages(pageRepository.findBySiteId(site.getId()).size());
+            item.setLemmas(lemmaRepository.findBySite(site.getId()).size());
+            item.setError(site.getLastError());
+            item.setStatusTime(site.getStatusTime());
+            item.setStatus(site.getStatus().toString());
             detailed.add(item);
         }
+
+
+
 
         StatisticsResponse response = new StatisticsResponse();
         StatisticsData data = new StatisticsData();
@@ -69,5 +76,4 @@ public class StatisticsServiceImpl implements StatisticsService {
         response.setResult(true);
         return response;
     }
-
 }
