@@ -3,15 +3,15 @@ server:
 
 spring:
   datasource:
-    username: user
-    password: pass
+    username: your username
+    password: your password
     url: jdbc:mysql://localhost:3306/search_engine
 
   jpa:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL8Dialect
-    hibernate.ddl-auto: update
+    hibernate.ddl-auto: create
     generate-ddl: true
     show-sql: true
 # example values
@@ -20,10 +20,11 @@ indexing-settings:
   sites:
 #    - url: https://discord.com
 #      name: Лента.ру
+    - url: http://www.nightman.ru
+      name: Nightman
     - url: https://skillbox.ru
       name: Skillbox
-#    - url: http://www.nightman.ru
-#      name: Nightman
+
 
 
 

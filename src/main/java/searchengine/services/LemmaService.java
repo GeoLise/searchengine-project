@@ -2,6 +2,7 @@ package searchengine.services;
 
 import org.apache.lucene.morphology.LuceneMorphology;
 import org.apache.lucene.morphology.WrongCharaterException;
+import org.apache.lucene.morphology.english.EnglishLuceneMorphology;
 import org.apache.lucene.morphology.russian.RussianLuceneMorphology;
 import org.jsoup.Jsoup;
 
@@ -10,11 +11,13 @@ import java.util.HashMap;
 
 public class LemmaService {
 
-    private static LuceneMorphology luceneMorph;
+    private static final LuceneMorphology RussianLuceneMorph;
+    private static final LuceneMorphology EnglishLuceneMorph;
 
     static {
         try {
-            luceneMorph = new RussianLuceneMorphology();
+            EnglishLuceneMorph = new EnglishLuceneMorphology();
+            RussianLuceneMorph = new RussianLuceneMorphology();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -26,52 +29,53 @@ public class LemmaService {
         HashMap<String, Integer> lemmas = new HashMap<>();
         text = text.replaceAll("[\\p{Punct}\\d]", "").replaceAll("\\s+", " ").trim().toLowerCase();
         String[] words = text.split(" ");
-        for (String word : words){
+        for (String word : words) {
+            word = word.replaceAll(" ", "");
+            String partOfSpeech;
+
             try {
-                word = word.replaceAll(" ", "");
-                word = luceneMorph.getNormalForms(word).get(0);
-                String partOfSpeech = luceneMorph.getMorphInfo(word).get(0);
-                if (partOfSpeech.contains("МЕЖД") || partOfSpeech.contains("ПРЕДЛ") || partOfSpeech.contains("СОЮЗ")) {
+                partOfSpeech = RussianLuceneMorph.getMorphInfo(word).get(0);
+                word = RussianLuceneMorph.getNormalForms(word).get(0);
+            } catch (WrongCharaterException e1) {
+                try {
+                    partOfSpeech = EnglishLuceneMorph.getMorphInfo(word).get(0);
+                    word = EnglishLuceneMorph.getNormalForms(word).get(0);
+                } catch (WrongCharaterException e2) {
                     continue;
                 }
-                if (!lemmas.containsKey(word)) {
-                    lemmas.put(word, 1);
-                } else {
-                    lemmas.replace(word, lemmas.get(word) + 1);
-                }
-            } catch (WrongCharaterException e){
+            }
 
+            if (partOfSpeech.contains("МЕЖД") || partOfSpeech.contains("ПРЕДЛ") || partOfSpeech.contains("СОЮЗ")
+                    || partOfSpeech.contains("CONJ") || partOfSpeech.contains("PREP") || partOfSpeech.contains("INT")) {
+                continue;
+            }
+            if (!lemmas.containsKey(word)) {
+                lemmas.put(word, 1);
+            } else {
+                lemmas.replace(word, lemmas.get(word) + 1);
             }
         }
         return lemmas;
     }
 
-    public static String toSimpleWord(String word){
+    public static String toSimpleWord(String word) {
         word = word.replaceAll("[\\p{Punct}\\d]", "").replaceAll("\\s+", " ").trim().toLowerCase();
+        String simpleWord;
         try {
-            String simpleWord = luceneMorph.getNormalForms(word).get(0);
+            simpleWord = RussianLuceneMorph.getNormalForms(word).get(0);
             return simpleWord;
-        } catch (Exception e){
-            return word;
+        } catch (Exception e1) {
+            try {
+                simpleWord = EnglishLuceneMorph.getNormalForms(word).get(0);
+                return simpleWord;
+            } catch (Exception e2) {
+                return word;
+            }
         }
     }
 
-    public static String toSimpleText(String text) throws IOException {
-        text = removeHtmlTags((text));
-        String simpleText = "";
-        text = text.replaceAll("[\\p{Punct}\\d]", "").replaceAll("\\s+", " ").trim().toLowerCase();
-        String[] words = text.split(" ");
-        for(String word : words){
-            word = word.replaceAll(" ", "");
-            word = luceneMorph.getNormalForms(word).get(0);
-            simpleText += word + " ";
-        }
-        simpleText = simpleText.trim();
 
-        return simpleText;
-    }
-
-    public static String removeHtmlTags(String html){
+    public static String removeHtmlTags(String html) {
         return Jsoup.parse(html).text();
     }
 }

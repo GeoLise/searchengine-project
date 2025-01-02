@@ -3,7 +3,6 @@ package searchengine.model;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
-import lombok.ToString;
 
 import javax.persistence.*;
 import java.util.ArrayList;
@@ -13,7 +12,7 @@ import java.util.List;
 @Setter
 @EqualsAndHashCode
 @Entity
-@Table(name = "page")
+@Table(name = "page", indexes = {@javax.persistence.Index(name = "idx_path", columnList = "path")})
 public class Page {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -25,7 +24,7 @@ public class Page {
     @EqualsAndHashCode.Exclude
     private Site site;
 
-    @Column(columnDefinition = "text")
+    @Column(columnDefinition = "VARCHAR(255)", nullable = false)
     @EqualsAndHashCode.Exclude
     private String path;
 

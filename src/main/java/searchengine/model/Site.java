@@ -38,5 +38,10 @@ public class Site {
             cascade = CascadeType.ALL)
     private List<Lemma> lemmas;
 
+    @OneToMany(mappedBy = "site",
+            fetch = FetchType.LAZY,
+            cascade = CascadeType.ALL)
+    private List<Page> pages;
+
 }
 

@@ -60,8 +60,6 @@ public class IndexingService {
 
 
 
-
-
     private void mapper(String url){
         String siteName = url.replace("https://", "").replace("http://", "").replace("/", "");
         searchengine.model.Site site = new searchengine.model.Site();

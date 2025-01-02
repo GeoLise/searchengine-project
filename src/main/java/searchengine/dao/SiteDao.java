@@ -1,8 +1,10 @@
 package searchengine.dao;
 
 
+import org.hibernate.Hibernate;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
+import org.hibernate.annotations.Proxy;
 import org.springframework.stereotype.Component;
 import searchengine.model.Site;
 import searchengine.utils.HibernateUtil;
@@ -54,6 +56,10 @@ public class SiteDao implements DaoInterface<Site, Integer>{
         Session session = HibernateUtil.getSession();
         Query query = session.createQuery("from Site");
         List<Site> result = query.getResultList();
+        result.forEach(site -> {
+            Hibernate.initialize(site.getLemmas());
+            Hibernate.initialize(site.getPages());
+        });
         session.close();
         return result;
     }
