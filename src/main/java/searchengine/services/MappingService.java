@@ -27,13 +27,12 @@ public class MappingService extends RecursiveTask<Page> {
     private final PageDao pageRepository;
     private final SiteDao siteRepository;
     private final LemmaDao lemmaRepository;
-
     private final IndexDao indexRepository;
+
     private final String url;
     private final Site site;
     private static final AtomicBoolean isStopped = new AtomicBoolean(false);
 
-    private static CopyOnWriteArrayList<Lemma> allLemmas = new CopyOnWriteArrayList<>();
 
     public MappingService(String url, PageDao pageRepository, Site site, SiteDao siteRepository, LemmaDao lemmaRepository, IndexDao indexRepository) {
         this.url = url;
@@ -42,7 +41,6 @@ public class MappingService extends RecursiveTask<Page> {
         this.siteRepository = siteRepository;
         this.lemmaRepository = lemmaRepository;
         this.indexRepository = indexRepository;
-        this.allLemmas = (CopyOnWriteArrayList<Lemma>) lemmaRepository.findAll();
     }
 
 
@@ -71,7 +69,8 @@ public class MappingService extends RecursiveTask<Page> {
 
                 page.set(addPage(url, response));
             } catch (HttpStatusException e) {
-                page.set(addErrorPage(e.getUrl(), e.getStatusCode()));
+                addErrorPage(e.getUrl(), e.getStatusCode());
+                return null;
             }
         } catch (IOException e) {
 
@@ -88,6 +87,9 @@ public class MappingService extends RecursiveTask<Page> {
 
 
     private List<MappingService> addTreads(List<MappingService> mappers, Connection.Response response) throws IOException {
+        if (isStopped.get()){
+            return null;
+        }
         Document document = response.parse();
         Elements elements = document.select("a[href]");
         for (int i = 0; i<elements.size(); i++){
@@ -118,9 +120,11 @@ public class MappingService extends RecursiveTask<Page> {
         page.setPath(url.replace(mainUrl, "").isEmpty() ? "/" : url.replace(mainUrl, ""));
         page.setCode(response.statusCode());
         pageRepository.save(page);
-        site.setStatusTime(LocalDateTime.now());
-        siteRepository.update(site);
-        addLemmasAndIndexes(body, page);
+        if (!isStopped.get()) {
+            site.setStatusTime(LocalDateTime.now());
+            siteRepository.update(site);
+            addLemmasAndIndexes(body, page);
+        }
         return page;
     }
 
@@ -133,8 +137,10 @@ public class MappingService extends RecursiveTask<Page> {
         page.setPath(url.replace(mainUrl, "").isEmpty() ? "/" : url.replace(mainUrl, ""));
         page.setCode(statusCode);
         pageRepository.save(page);
-        site.setStatusTime(LocalDateTime.now());
-        siteRepository.update(site);
+        if(!isStopped.get()) {
+            site.setStatusTime(LocalDateTime.now());
+            siteRepository.update(site);
+        }
         return page;
     }
 

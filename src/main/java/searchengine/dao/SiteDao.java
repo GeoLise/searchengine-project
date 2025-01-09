@@ -91,9 +91,10 @@ public class SiteDao implements DaoInterface<Site, Integer>{
 
     public boolean isExistByUrl(String url){
         Session session = HibernateUtil.getSession();
-        session.setDefaultReadOnly(true);
-        Query query = session.createQuery("from site where url = " + '"' + url + '"');
-        boolean result = (!query.getResultList().isEmpty());
+        Transaction tx = session.beginTransaction();
+        Query query = session.createQuery("from Site where url = " + "'" + url + "'");
+        boolean result = !query.getResultList().isEmpty();
+        tx.commit();
         session.close();
         return result;
     }
@@ -115,4 +116,17 @@ public class SiteDao implements DaoInterface<Site, Integer>{
         session.close();
         return result;
     }
+
+    public void saveOrUpdate(Site site){
+        Session session = HibernateUtil.getSession();
+        Transaction tx = session.beginTransaction();
+        if (isExistByUrl(site.getUrl())){
+            session.update(site);
+        } else {
+            session.save(site);
+        }
+        tx.commit();
+        session.close();
+    }
+
 }

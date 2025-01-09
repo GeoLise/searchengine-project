@@ -3,7 +3,6 @@ package searchengine.controllers;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import searchengine.dto.statistics.ErrorResponse;
-import searchengine.dto.statistics.SearchResponse;
 import searchengine.dto.statistics.Response;
 import searchengine.dto.statistics.StatisticsResponse;
 import searchengine.services.IndexingService;
@@ -17,7 +16,7 @@ import java.io.IOException;
 public class ApiController {
 
     private final StatisticsService statisticsService;
-    private final IndexingService indexingService;
+    private IndexingService indexingService;
 
     public ApiController(StatisticsService statisticsService, IndexingService indexingService) {
         this.statisticsService = statisticsService;
@@ -32,7 +31,7 @@ public class ApiController {
     @GetMapping("/startIndexing")
     public ResponseEntity<Object> startIndexing() throws IOException {
         if (!IndexingService.isInProcess()) {
-            IndexingService.process();
+            indexingService.process();
             indexingService.startIndexing();
             return ResponseEntity.ok(new Response());
         }
@@ -44,7 +43,7 @@ public class ApiController {
     @GetMapping("/stopIndexing")
     public ResponseEntity<Object> stopIndexing(){
         if (IndexingService.isInProcess()) {
-            IndexingService.stop();
+            indexingService.stop();
             return ResponseEntity.ok(new Response());
         } else {
             return ResponseEntity.ok(new ErrorResponse("Индексация не запущена"));
