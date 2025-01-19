@@ -17,6 +17,7 @@ import searchengine.model.SiteStatus;
 
 import javax.persistence.NoResultException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -35,20 +36,21 @@ public class IndexingService {
     private final LemmaDao lemmaRepository;
     private final IndexDao indexRepository;
 
-    public void startIndexing(){
-        try {
-            MappingService.clearData();
-        } catch (Exception e){
+    List<MappingService> services = new ArrayList<>();
 
+    public Object startIndexing(){
+        if (inProcess){
+            return new ErrorResponse("Индексация уже запущена");
         }
+
         process();
 
         List<Site> sitesList = sites.getSites();
 
-        indexRepository.deleteAll();
-        lemmaRepository.deleteAll();
-        pageRepository.deleteAll();
-        siteRepository.deleteAll();
+//        indexRepository.deleteAll();
+//        lemmaRepository.deleteAll();
+//        pageRepository.deleteAll();
+//        siteRepository.deleteAll();
 
         ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
@@ -66,30 +68,41 @@ public class IndexingService {
             });
         }
         executor.shutdown();
+        return new Response();
     }
 
 
 
     private void mapper(String url, searchengine.model.Site site){
         siteRepository.saveOrUpdate(site);
-        MappingService service = new MappingService(url, pageRepository, site, siteRepository, lemmaRepository, indexRepository);
+        MappingService service = new MappingService(url, site);
+        services.add(service);
         new ForkJoinPool().invoke(service);
         site = service.getSite();
         if (site.getStatus() == SiteStatus.FAILED){
             return;
         }
-        if (inProcess) {
+        else if (inProcess) {
             site.setStatus(SiteStatus.INDEXED);
             siteRepository.update(site);
         }
         inProcess = false;
-        MappingService.setIsStopped(true);
     }
 
 
-    public void stop() {
+    public Object stop() {
+        services.forEach(MappingService::clearData);
+        services.clear();
+        if (!inProcess){
+            return new ErrorResponse("Индексация не запущена");
+        }
         inProcess = false;
         MappingService.setIsStopped(true);
+        try {
+            Thread.sleep(100);
+        } catch (Exception e){
+
+        }
         siteRepository.findAll().forEach(site -> {
             if (site.getStatus().equals(SiteStatus.INDEXING)){
                 site.setStatus(SiteStatus.FAILED);
@@ -97,6 +110,7 @@ public class IndexingService {
                 siteRepository.update(site);
             }
         });
+        return new Response();
     }
 
     public void process(){
@@ -107,11 +121,7 @@ public class IndexingService {
 
 
     public Object indexPage(String url){
-        try {
-            MappingService.clearData();
-        } catch (Exception e){
 
-        }
         process();
         boolean pageIsInSite = false;
         for(Site site : sites.getSites()){
@@ -132,17 +142,17 @@ public class IndexingService {
 
         searchengine.model.Site site;
 
-        try {
-            site = (searchengine.model.Site) siteRepository.findByUrl(mainUrl);
-        } catch (NoResultException e){
+
+        site = (searchengine.model.Site) siteRepository.findByUrl(mainUrl);
+        if (site == null){
             String siteName = mainUrl.replace("https://", "").replace("http://", "").replace("/", "");
             site = new searchengine.model.Site();
-            site.setStatus(SiteStatus.INDEXING);
             site.setName(siteName);
             site.setStatusTime(LocalDateTime.now());
             site.setUrl(mainUrl);
             site.setLastError(null);
         }
+        site.setStatus(SiteStatus.INDEXING);
         List<Page> pages = pageRepository.findBySiteId(site.getId());
         if (!pages.isEmpty()) {
             for (Page page : pages) {

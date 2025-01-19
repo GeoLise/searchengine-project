@@ -35,7 +35,7 @@ public class Page {
     @EqualsAndHashCode.Exclude
     private String content;
 
-    @ManyToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+    @ManyToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JoinTable(
             name = "indexes",
             joinColumns = @JoinColumn(name="page_id"),
@@ -43,7 +43,7 @@ public class Page {
     @EqualsAndHashCode.Exclude
     private List<Lemma> lemmas = new ArrayList<>();
 
-    @OneToMany(mappedBy = "page", fetch = FetchType.EAGER)
+    @OneToMany(mappedBy = "page", fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     @EqualsAndHashCode.Exclude
     private List<Index> indexes = new ArrayList<>();
 

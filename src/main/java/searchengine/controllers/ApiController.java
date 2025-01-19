@@ -2,8 +2,6 @@ package searchengine.controllers;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import searchengine.dto.statistics.ErrorResponse;
-import searchengine.dto.statistics.Response;
 import searchengine.dto.statistics.StatisticsResponse;
 import searchengine.services.IndexingService;
 import searchengine.services.SearchService;
@@ -30,24 +28,12 @@ public class ApiController {
 
     @GetMapping("/startIndexing")
     public ResponseEntity<Object> startIndexing() throws IOException {
-        if (!IndexingService.isInProcess()) {
-            indexingService.process();
-            indexingService.startIndexing();
-            return ResponseEntity.ok(new Response());
-        }
-        else{
-            return ResponseEntity.ok(new ErrorResponse("Индексация уже запущена"));
-        }
+        return ResponseEntity.ok(indexingService.startIndexing());
     }
 
     @GetMapping("/stopIndexing")
     public ResponseEntity<Object> stopIndexing(){
-        if (IndexingService.isInProcess()) {
-            indexingService.stop();
-            return ResponseEntity.ok(new Response());
-        } else {
-            return ResponseEntity.ok(new ErrorResponse("Индексация не запущена"));
-        }
+        return ResponseEntity.ok(indexingService.stop());
     }
 
     @PostMapping("/indexPage")

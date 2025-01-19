@@ -4,7 +4,7 @@ server:
 spring:
   datasource:
     username: your username
-    password: you password
+    password: your password
     url: jdbc:mysql://localhost:3306/search_engine
 
   jpa:
@@ -14,14 +14,13 @@ spring:
     hibernate.ddl-auto: create
     generate-ddl: true
     show-sql: true
+
 # example values
 
 indexing-settings:
   sites:
 #    - url: https://discord.com
 #      name: Лента.ру
-    - url: http://www.playback.ru
-      name: Nightman
     - url: https://skillbox.ru
       name: Skillbox
 

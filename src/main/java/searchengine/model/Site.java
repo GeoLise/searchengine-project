@@ -36,7 +36,7 @@ public class Site {
     @OneToMany(mappedBy = "site",
             fetch = FetchType.LAZY,
             cascade = CascadeType.ALL)
-    private List<Lemma> lemmas;
+    private List<Lemma> lemmaList;
 
     @OneToMany(mappedBy = "site",
             fetch = FetchType.LAZY,

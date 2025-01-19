@@ -13,7 +13,7 @@ import java.util.List;
 @Setter
 @EqualsAndHashCode
 @Entity
-@Table(name = "lemma")
+@Table(name = "lemmas")
 public class Lemma {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -34,7 +34,7 @@ public class Lemma {
     @EqualsAndHashCode.Exclude
     private int frequency;
 
-    @ManyToMany(fetch = FetchType.EAGER)
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "indexes",
             joinColumns = @JoinColumn(name="lemma_id"),
@@ -42,7 +42,7 @@ public class Lemma {
     @EqualsAndHashCode.Exclude
     private List<Page> pages = new ArrayList<>();
 
-    @OneToMany(mappedBy = "lemma", fetch = FetchType.EAGER)
+    @OneToMany(mappedBy = "lemma", fetch = FetchType.LAZY)
     @EqualsAndHashCode.Exclude
     private List<Index> indexes = new ArrayList<>();
 

@@ -16,39 +16,42 @@ import java.io.IOException;
 import java.net.UnknownHostException;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.RecursiveTask;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 
 public class MappingService extends RecursiveTask<Page> {
     private static final CopyOnWriteArrayList<String> links = new CopyOnWriteArrayList<>();
 
-    private final PageDao pageRepository;
-    private final SiteDao siteRepository;
-    private final LemmaDao lemmaRepository;
-    private final IndexDao indexRepository;
+    private static final PageDao pageRepository = new PageDao();
+    private static final SiteDao siteRepository = new SiteDao();
+    private static final LemmaDao lemmaRepository = new LemmaDao();
+    private static final IndexDao indexRepository = new IndexDao();
+
+    private static final CopyOnWriteArrayList<String> lemmas = new CopyOnWriteArrayList<>(lemmaRepository.findAll().stream().map(Lemma::getLemma).collect(Collectors.toList()));
 
     private final String url;
     private final Site site;
     private static final AtomicBoolean isStopped = new AtomicBoolean(false);
 
 
-    public MappingService(String url, PageDao pageRepository, Site site, SiteDao siteRepository, LemmaDao lemmaRepository, IndexDao indexRepository) {
+    public MappingService(String url, Site site) {
         this.url = url;
         this.site = site;
-        this.pageRepository = pageRepository;
-        this.siteRepository = siteRepository;
-        this.lemmaRepository = lemmaRepository;
-        this.indexRepository = indexRepository;
     }
 
 
     @Override
     protected Page compute() {
         if (isStopped.get()) {
+            clearData();
             return null;
         }
+        site.setStatusTime(LocalDateTime.now());
+        siteRepository.update(site);
         AtomicReference<Page> page = new AtomicReference<>(new Page());
         List<Page> pageList = new ArrayList<>();
         List<MappingService> mappers = new CopyOnWriteArrayList<>();
@@ -65,7 +68,7 @@ public class MappingService extends RecursiveTask<Page> {
                     return null;
                 }
 
-                addTreads(mappers, response);
+                mappers.addAll(addTreads(mappers, response));
 
                 page.set(addPage(url, response));
             } catch (HttpStatusException e) {
@@ -99,7 +102,7 @@ public class MappingService extends RecursiveTask<Page> {
             String currentUrl = elements.get(i).absUrl("href");
             if (!currentUrl.isEmpty() && currentUrl.startsWith(url) && !links.contains(currentUrl) && !currentUrl
                     .contains("#") && (!currentUrl.contains(".pdf"))) {
-                MappingService linkExecutor = new MappingService(currentUrl, pageRepository, site, siteRepository, lemmaRepository, indexRepository);
+                MappingService linkExecutor = new MappingService(currentUrl,site);
                 linkExecutor.fork();
                 mappers.add(linkExecutor);
                 links.add(currentUrl);
@@ -111,6 +114,9 @@ public class MappingService extends RecursiveTask<Page> {
 
 
     private Page addPage(String url, Connection.Response response) throws IOException {
+        if (isStopped.get()){
+            return null;
+        }
         String mainUrl = site.getUrl();
         url = StringUtils.substring(url, 0,  url.charAt(url.length() - 1) == '/' ? url.length() - 1 : url.length());
         Page page = new Page();
@@ -120,15 +126,14 @@ public class MappingService extends RecursiveTask<Page> {
         page.setPath(url.replace(mainUrl, "").isEmpty() ? "/" : url.replace(mainUrl, ""));
         page.setCode(response.statusCode());
         pageRepository.save(page);
-        if (!isStopped.get()) {
-            site.setStatusTime(LocalDateTime.now());
-            siteRepository.update(site);
-            addLemmasAndIndexes(body, page);
-        }
+        addLemmasAndIndexes(body, page);
         return page;
     }
 
     private Page addErrorPage(String url, int statusCode) {
+        if (isStopped.get()){
+            return null;
+        }
         String mainUrl = site.getUrl();
         url = StringUtils.substring(url, 0, url.length() - 1);
         Page page = new Page();
@@ -137,10 +142,6 @@ public class MappingService extends RecursiveTask<Page> {
         page.setPath(url.replace(mainUrl, "").isEmpty() ? "/" : url.replace(mainUrl, ""));
         page.setCode(statusCode);
         pageRepository.save(page);
-        if(!isStopped.get()) {
-            site.setStatusTime(LocalDateTime.now());
-            siteRepository.update(site);
-        }
         return page;
     }
 
@@ -150,25 +151,29 @@ public class MappingService extends RecursiveTask<Page> {
             if (isStopped.get()) {
                 break;
             }
-            synchronized (lemmaRepository) {
-                Lemma lemma = lemmaRepository.findByNameAndSite(entry.getKey(), site.getId());
-                if (lemma != null) {
-                    lemma.setFrequency(lemma.getFrequency() + 1);
-                    lemmaRepository.update(lemma);
-                } else {
-                    lemma = new Lemma();
-                    lemma.setFrequency(1);
-                    lemma.setSite(site);
-                    lemma.setLemma(entry.getKey());
-                    lemmaRepository.save(lemma);
-                }
-                Index index = new Index();
-                index.setPage(page);
-                index.setLemma(lemma);
-                index.setRank(entry.getValue());
-                indexRepository.save(index);
+            if (!lemmas.contains(entry.getKey())){
+                createAndSaveLemma(entry.getKey());
+            } else if (lemmas.contains(entry.getKey()) && lemmaRepository.findByNameAndSite(entry.getKey(), site.getId()) != null){
+                lemmaRepository.addFrequency(entry.getKey(), site.getId());
+            } else {
+                createAndSaveLemma(entry.getKey());
             }
+            Lemma lemma = lemmaRepository.findByNameAndSite(entry.getKey(), site.getId());
+            Index index = new Index();
+            index.setPage(page);
+            index.setLemma(lemma);
+            index.setRank(entry.getValue());
+            indexRepository.save(index);
         }
+    }
+
+    private void createAndSaveLemma(String stringLemma){
+        lemmas.add(stringLemma);
+        Lemma lemma = new Lemma();
+        lemma.setFrequency(1);
+        lemma.setSite(site);
+        lemma.setLemma(stringLemma);
+        lemmaRepository.save(lemma);
     }
 
 
@@ -181,9 +186,9 @@ public class MappingService extends RecursiveTask<Page> {
         isStopped.set(value);
     }
 
-    public static void clearData(){
+    public void clearData(){
         links.clear();
-        MappingService.getPool().shutdown();
+        lemmas.clear();
     }
 
 }

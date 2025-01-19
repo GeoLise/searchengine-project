@@ -18,7 +18,7 @@ public class Index {
     @JoinColumn(name = "page_id")
     private Page page;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "lemma_id")
     private Lemma lemma;
 

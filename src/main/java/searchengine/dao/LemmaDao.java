@@ -2,111 +2,141 @@ package searchengine.dao;
 
 import org.hibernate.Session;
 import org.hibernate.Transaction;
+import org.hibernate.query.NativeQuery;
 import org.springframework.stereotype.Component;
 import searchengine.model.Lemma;
 import searchengine.model.Page;
 import searchengine.utils.HibernateUtil;
 
-import javax.persistence.LockModeType;
 import javax.persistence.NoResultException;
 import javax.persistence.Query;
-import java.util.HashMap;
 import java.util.List;
 
 @Component
 public class LemmaDao implements DaoInterface<Lemma, Integer> {
+
     @Override
     public void save(Lemma lemma) {
         Session session = HibernateUtil.getSession();
         Transaction tx = session.beginTransaction();
-        session.save(lemma);
-        tx.commit();
-        session.close();
+        try {
+            session.save(lemma);
+        } catch (Exception e){
+
+        } finally {
+            tx.commit();
+            session.close();
+        }
     }
 
     @Override
     public void update(Lemma lemma) {
         Session session = HibernateUtil.getSession();
         Transaction tx = session.beginTransaction();
-        session.update(lemma);
-        tx.commit();
-        session.close();
+        try {
+            session.update(lemma);
+        } catch (Exception e){
+
+        } finally {
+            tx.commit();
+            session.close();
+        }
     }
 
     @Override
-    public Lemma findById(Integer integer) {
-        return null;
+    public Lemma findById(Integer id) {
+        Session session = HibernateUtil.getSession();
+        Transaction tx = session.beginTransaction();
+        try {
+            Lemma result = session.get(Lemma.class, id);
+            return result;
+        } catch (Exception e){
+            return null;
+        } finally {
+            tx.commit();
+            session.close();
+        }
     }
 
     @Override
     public void delete(Lemma lemma) {
         Session session = HibernateUtil.getSession();
         Transaction tx = session.beginTransaction();
-        session.delete(lemma);
-        tx.commit();
-        session.close();
+        try {
+            session.delete(lemma);
+        } catch (Exception e){
+
+        } finally {
+            tx.commit();
+            session.close();
+        }
     }
 
     @Override
     public List<Lemma> findAll() {
         Session session = HibernateUtil.getSession();
-        Query query = session.createQuery("from Lemma");
-        List<Lemma> result = query.getResultList();
-        session.close();
-        return result;
-    }
-
-    @Override
-    public void deleteAll() {
-        List<Lemma> lemmas = findAll();
+        Transaction tx = session.beginTransaction();
         try {
-            lemmas.forEach(this::delete);
+            Query query = session.createQuery("from Lemma");
+            List<Lemma> result = query.getResultList();
+            return result;
         } catch (Exception e){
-
+            return null;
+        } finally {
+            tx.commit();
+            session.close();
         }
     }
 
     @Override
-    public void dropAndCreateTable() {
-        String dropPage = "DROP TABLE IF EXISTS lemma";
-        String createPage = "CREATE TABLE lemma(" +
-                "id INT NOT NULL AUTO_INCREMENT, " +
-                "lemma VARCHAR(255) NOT NULL, " +
-                "frequency INT NOT NULL, " +
-                "site_id INT NOT NULL, " +
-                "PRIMARY KEY(id))";
-
+    public void deleteAll() {
         Session session = HibernateUtil.getSession();
         Transaction tx = session.beginTransaction();
-        session.createSQLQuery(dropPage).executeUpdate();
-        session.createSQLQuery(createPage).executeUpdate();
-        tx.commit();
-        session.close();
+        try{
+            Query query = session.createSQLQuery("SET FOREIGN_KEY_CHECKS = 0");
+            query.executeUpdate();
+            query = session.createSQLQuery("TRUNCATE TABLE lemmas");
+            query.executeUpdate();
+            query = session.createSQLQuery("SET FOREIGN_KEY_CHECKS = 1");
+            query.executeUpdate();
+        } catch (Exception e){
+
+        } finally {
+            tx.commit();
+            session.close();
+        }
     }
 
-    public Lemma findByNameAndSite(String name, int site_id){
+
+    public Lemma findByNameAndSite(String name, int siteId){
         Session session = HibernateUtil.getSession();
+        Transaction tx = session.beginTransaction();
         try {
-            Query query = session.createQuery("from Lemma where lemma = " + "'" + name + "'" + " and site_id = " + site_id);
+            Query query = session.createQuery("from Lemma where lemma = :lemma and site_id = :siteId")
+                    .setParameter("lemma", name)
+                    .setParameter("siteId", siteId);
             Lemma lemma = (Lemma) query.getSingleResult();
-            session.close();
             return lemma;
         } catch (NoResultException e){
-            session.close();
             return null;
+        } finally {
+            tx.commit();
+            session.close();
         }
     }
 
     public List<Lemma> findByName(String name){
         Session session = HibernateUtil.getSession();
+        Transaction tx = session.beginTransaction();
         try {
             Query query = session.createQuery("from Lemma where lemma = " + "'" + name + "'");
             List<Lemma> result = query.getResultList();
-            session.close();
             return result;
         } catch (NoResultException e){
-            session.close();
             return null;
+        } finally {
+            tx.commit();
+            session.close();
         }
     }
 
@@ -120,6 +150,57 @@ public class LemmaDao implements DaoInterface<Lemma, Integer> {
         } catch (NoResultException e){
             session.close();
             return null;
+        }
+    }
+
+    public void addFrequency(String lemma, int siteId){
+        Session session = HibernateUtil.getSession();
+        Transaction tx = session.beginTransaction();
+        Query query = session.createQuery("update Lemma set frequency = frequency + 1 where lemma = :lemma and site_id = :siteId")
+                .setParameter("lemma", lemma)
+                .setParameter("siteId", siteId);
+        query.executeUpdate();
+        tx.commit();
+        session.close();
+    }
+
+    public  List<Page> getPages(Lemma lemma){
+        Session session = HibernateUtil.getSession();
+        Transaction tx = session.beginTransaction();
+        Query query = session.createQuery("select p from Page p join p.indexes i where i.lemma.id = :lemmaId").setParameter("lemmaId", lemma.getId());
+        List<Page> result = query.getResultList();
+        tx.commit();
+        session.close();
+        return  result;
+    }
+
+    public int count(){
+        Session session = HibernateUtil.getSession();
+        Transaction tx = session.beginTransaction();
+        try{
+            NativeQuery query = session.createSQLQuery("select count(*) as count from lemmas");
+            return ((Number) query.uniqueResult()).intValue();
+        } catch (Exception e){
+            return 0;
+        } finally {
+            tx.commit();
+            session.close();
+        }
+    }
+
+
+    public int count(int siteId){
+        Session session = HibernateUtil.getSession();
+        Transaction tx = session.beginTransaction();
+        try{
+            NativeQuery query = session.createSQLQuery("select count(*) as count from lemmas where site_id = :siteId")
+                    .setParameter("siteId", siteId);
+            return ((Number) query.uniqueResult()).intValue();
+        } catch (Exception e){
+            return 0;
+        } finally {
+            tx.commit();
+            session.close();
         }
     }
 

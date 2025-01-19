@@ -4,6 +4,7 @@ import org.hibernate.Session;
 import org.hibernate.Transaction;
 import org.springframework.stereotype.Component;
 import searchengine.model.Index;
+import searchengine.model.Site;
 import searchengine.utils.HibernateUtil;
 
 import javax.persistence.Query;
@@ -15,57 +16,93 @@ public class IndexDao implements DaoInterface<Index, Integer> {
     public void save(Index index) {
         Session session = HibernateUtil.getSession();
         Transaction tx = session.beginTransaction();
-        session.save(index);
-        tx.commit();
-        session.close();
+        try {
+            session.save(index);
+        } catch (Exception e){
+
+        } finally {
+            tx.commit();
+            session.close();
+        }
     }
 
     @Override
     public void update(Index index) {
+        Session session = HibernateUtil.getSession();
+        Transaction tx = session.beginTransaction();
+        try {
+            session.update(index);
+        } catch (Exception e){
 
+        } finally {
+            tx.commit();
+            session.close();
+        }
     }
 
     @Override
-    public Index findById(Integer integer) {
-        return null;
+    public Index findById(Integer id) {
+        Session session = HibernateUtil.getSession();
+        Transaction tx = session.beginTransaction();
+        try {
+            Index result = session.get(Index.class, id);
+            return result;
+        } catch (Exception e){
+            return null;
+        } finally {
+            tx.commit();
+            session.close();
+        }
     }
 
     @Override
     public void delete(Index index) {
+        Session session = HibernateUtil.getSession();
+        Transaction tx = session.beginTransaction();
+        try {
+            session.delete(index);
+        } catch (Exception e){
 
+        } finally {
+            tx.commit();
+            session.close();
+        }
     }
 
     @Override
     public List<Index> findAll() {
         Session session = HibernateUtil.getSession();
-        Query query = session.createQuery("from Index");
-        List<Index> result = query.getResultList();
-        session.close();
-        return result;
+        Transaction tx = session.beginTransaction();
+        try {
+            Query query = session.createQuery("from Index");
+            List<Index> result = query.getResultList();
+            return result;
+        } catch (Exception e){
+            return null;
+        } finally {
+            tx.commit();
+            session.close();
+        }
     }
 
     @Override
     public void deleteAll() {
-        List<Index> indexes = findAll();
-        indexes.forEach(this::delete);
-    }
-
-    @Override
-    public void dropAndCreateTable() {
-        String dropPage = "DROP TABLE IF EXISTS index";
-//        String createPage = "CREATE TABLE page (" +
-//                "id INT NOT NULL AUTO_INCREMENT, " +
-//                "path TEXT NOT NULL, " +
-//                "code INT NOT NULL, " +
-//                "content MEDIUMTEXT NOT NULL, " +
-//                "site_id INT NOT NULL, " +
-//                "PRIMARY KEY(id), KEY(path(200)))";
         Session session = HibernateUtil.getSession();
         Transaction tx = session.beginTransaction();
-        session.createSQLQuery(dropPage).executeUpdate();
-//        session.createSQLQuery(createPage).executeUpdate();
-        tx.commit();
-        session.close();
+        try{
+            Query query = session.createSQLQuery("SET FOREIGN_KEY_CHECKS = 0");
+            query.executeUpdate();
+            query = session.createSQLQuery("TRUNCATE TABLE indexes");
+            query.executeUpdate();
+            query = session.createSQLQuery("SET FOREIGN_KEY_CHECKS = 1");
+            query.executeUpdate();
+        } catch (Exception e){
 
+        } finally {
+            tx.commit();
+            session.close();
+        }
     }
+
+
 }

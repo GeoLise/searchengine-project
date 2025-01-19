@@ -2,10 +2,13 @@ package searchengine.dao;
 
 import org.hibernate.Session;
 import org.hibernate.Transaction;
+import org.hibernate.query.NativeQuery;
 import org.springframework.stereotype.Component;
+import searchengine.model.Lemma;
 import searchengine.model.Page;
 import searchengine.utils.HibernateUtil;
 
+import javax.persistence.NoResultException;
 import javax.persistence.Query;
 import java.util.List;
 
@@ -14,92 +17,137 @@ public class PageDao implements DaoInterface<Page, Integer>{
     @Override
     public void save(Page page) {
         Session session = HibernateUtil.getSession();
-        session.save(page);
-        session.close();
+        Transaction tx = session.beginTransaction();
+        try {
+            session.save(page);
+        } catch (Exception e){
+
+        } finally {
+            tx.commit();
+            session.close();
+        }
     }
 
     @Override
     public void update(Page page) {
         Session session = HibernateUtil.getSession();
-        session.update(page);
-        session.close();
+        Transaction tx = session.beginTransaction();
+        try {
+            session.update(page);
+        } catch (Exception e){
+
+        } finally {
+            tx.commit();
+            session.close();
+        }
     }
 
     @Override
     public Page findById(Integer id) {
         Session session = HibernateUtil.getSession();
-        session.setDefaultReadOnly(true);
-        Page result = session.get(Page.class, id);
-        session.close();
-        return result;
+        Transaction tx = session.beginTransaction();
+        try {
+            Page result = session.get(Page.class, id);
+            return result;
+        } catch (Exception e){
+            return null;
+        } finally {
+            tx.commit();
+            session.close();
+        }
     }
 
     @Override
     public void delete(Page page) {
         Session session = HibernateUtil.getSession();
         Transaction tx = session.beginTransaction();
-        session.delete(page);
-        tx.commit();
-        session.close();
+        try {
+            session.delete(page);
+        } catch (Exception e){
+
+        } finally {
+            tx.commit();
+            session.close();
+        }
     }
 
     @Override
     public List<Page> findAll() {
         Session session = HibernateUtil.getSession();
-        Query query = session.createQuery("from Page");
-        List<Page> result = query.getResultList();
-        session.close();
-        return result;
+        Transaction tx = session.beginTransaction();
+        try {
+            Query query = session.createQuery("from Page");
+            List<Page> result = query.getResultList();
+            return result;
+        } catch (Exception e){
+            return null;
+        } finally {
+            tx.commit();
+            session.close();
+        }
     }
 
     @Override
     public void deleteAll() {
-        List<Page> pages = findAll();
-        pages.forEach(this::delete);
-    }
-
-    @Override
-    public void dropAndCreateTable() {
-        String dropPage = "DROP TABLE IF EXISTS page";
-        String createPage = "CREATE TABLE page (" +
-                "id INT NOT NULL AUTO_INCREMENT, " +
-                "path TEXT NOT NULL, " +
-                "code INT NOT NULL, " +
-                "content MEDIUMTEXT NOT NULL, " +
-                "site_id INT NOT NULL, " +
-                "PRIMARY KEY(id), KEY(path(200)))";
         Session session = HibernateUtil.getSession();
         Transaction tx = session.beginTransaction();
-        session.createSQLQuery(dropPage).executeUpdate();
-        session.createSQLQuery(createPage).executeUpdate();
-        tx.commit();
-        session.close();
+        try{
+            Query query = session.createSQLQuery("SET FOREIGN_KEY_CHECKS = 0");
+            query.executeUpdate();
+            query = session.createSQLQuery("TRUNCATE TABLE page");
+            query.executeUpdate();
+            query = session.createSQLQuery("SET FOREIGN_KEY_CHECKS = 1");
+            query.executeUpdate();
+        } catch (Exception e){
+
+        } finally {
+            tx.commit();
+            session.close();
+        }
     }
 
     public List<Page> findBySiteId(Integer id){
         Session session = HibernateUtil.getSession();
-        Query query = session.createQuery("from Page where site_id = " + "'" + id + "'");
-        List<Page> result = query.getResultList();
-        session.close();
-        return result;
+        Transaction tx = session.beginTransaction();
+        try {
+            Query query = session.createQuery("from Page where site_id = " + "'" + id + "'");
+            List<Page> result = query.getResultList();
+            return result;
+        } catch (Exception e){
+            return null;
+        } finally {
+            tx.commit();
+            session.close();
+        }
     }
 
-    public List<Page> findByPath(String path){
+    public int count(){
         Session session = HibernateUtil.getSession();
-        Query query = session.createQuery("from Page where path = "+"'"+path+"'");
-        List<Page> result = query.getResultList();
-        session.close();
-        return result;
+        Transaction tx = session.beginTransaction();
+        try{
+            NativeQuery query = session.createSQLQuery("select count(*) as count from page");
+            return ((Number) query.uniqueResult()).intValue();
+        } catch (Exception e){
+            return 0;
+        } finally {
+            tx.commit();
+            session.close();
+        }
     }
 
-    public boolean ifExistByPath(String path){
+    public int count(int siteId){
         Session session = HibernateUtil.getSession();
-        Query query = session.createQuery("from Page where path = "+"'"+path+"'");
-        boolean result = !query.getResultList().isEmpty();
-        session.close();
-        return result;
+        Transaction tx = session.beginTransaction();
+        try{
+            NativeQuery query = session.createSQLQuery("select count(*) as count from page where site_id = :siteId")
+                    .setParameter("siteId", siteId);
+            return ((Number) query.uniqueResult()).intValue();
+        } catch (Exception e){
+            return 0;
+        } finally {
+            tx.commit();
+            session.close();
+        }
     }
-
-
 
 }

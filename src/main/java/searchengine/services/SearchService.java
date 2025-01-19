@@ -99,10 +99,11 @@ public class SearchService {
         return lemmas;
     }
 
+
     private Map<Page, Double> getPagesAndRelevance(List<Lemma> lemmas){
-        List<Page> pages = lemmas.get(0).getPages();
+        List<Page> pages = lemmaRepository.getPages(lemmas.get(0));
         for (Lemma lemma : lemmas){
-            List<Page> lemmaPages = lemma.getPages();
+            List<Page> lemmaPages = lemmaRepository.getPages(lemma);
             pages.retainAll(lemmaPages);
         }
         if (pages.isEmpty()){
