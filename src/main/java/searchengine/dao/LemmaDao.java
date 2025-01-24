@@ -10,6 +10,7 @@ import searchengine.utils.HibernateUtil;
 
 import javax.persistence.NoResultException;
 import javax.persistence.Query;
+import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -156,22 +157,33 @@ public class LemmaDao implements DaoInterface<Lemma, Integer> {
     public void addFrequency(String lemma, int siteId){
         Session session = HibernateUtil.getSession();
         Transaction tx = session.beginTransaction();
-        Query query = session.createQuery("update Lemma set frequency = frequency + 1 where lemma = :lemma and site_id = :siteId")
-                .setParameter("lemma", lemma)
-                .setParameter("siteId", siteId);
-        query.executeUpdate();
-        tx.commit();
-        session.close();
+        try {
+            Query query = session.createQuery("update Lemma set frequency = frequency + 1 where lemma = :lemma and site_id = :siteId")
+                    .setParameter("lemma", lemma)
+                    .setParameter("siteId", siteId);
+            query.executeUpdate();
+        } catch (Exception e){
+
+        } finally {
+            tx.commit();
+            session.close();
+        }
     }
 
     public  List<Page> getPages(Lemma lemma){
         Session session = HibernateUtil.getSession();
         Transaction tx = session.beginTransaction();
-        Query query = session.createQuery("select p from Page p join p.indexes i where i.lemma.id = :lemmaId").setParameter("lemmaId", lemma.getId());
-        List<Page> result = query.getResultList();
+        List<Page> result = new ArrayList<>();
+        try {
+            Query query = session.createQuery("select p from Page p join p.indexes i where i.lemma.id = :lemmaId").setParameter("lemmaId", lemma.getId());
+            result = query.getResultList();
+        } catch (Exception e){
+
+        } finally {
         tx.commit();
         session.close();
-        return  result;
+        }
+        return result;
     }
 
     public int count(){

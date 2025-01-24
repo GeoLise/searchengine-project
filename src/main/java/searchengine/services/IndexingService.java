@@ -15,7 +15,6 @@ import searchengine.dto.statistics.Response;
 import searchengine.model.Page;
 import searchengine.model.SiteStatus;
 
-import javax.persistence.NoResultException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -47,10 +46,10 @@ public class IndexingService {
 
         List<Site> sitesList = sites.getSites();
 
-//        indexRepository.deleteAll();
-//        lemmaRepository.deleteAll();
-//        pageRepository.deleteAll();
-//        siteRepository.deleteAll();
+        indexRepository.deleteAll();
+        lemmaRepository.deleteAll();
+        pageRepository.deleteAll();
+        siteRepository.deleteAll();
 
         ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
@@ -58,6 +57,9 @@ public class IndexingService {
             executor.submit(() -> {
                 String url = configSite.getUrl();
                 String siteName = url.replace("https://", "").replace("http://", "").replace("/", "");
+                if (url.charAt(url.length() - 1) == '/'){
+                    url = url.substring(0, url.length() - 1);
+                }
                 searchengine.model.Site site = new searchengine.model.Site();
                 site.setName(siteName);
                 site.setLastError(null);

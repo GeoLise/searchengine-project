@@ -59,7 +59,7 @@ public class MappingService extends RecursiveTask<Page> {
             try {
                 Connection.Response response;
                 try {
-                    response = Jsoup.connect(url).ignoreContentType(true).userAgent("Mozilla/5.0").execute();
+                    response = Jsoup.connect(url).ignoreContentType(true).userAgent("Mozilla/5.0 ").execute();
                 } catch (UnknownHostException e){
                     site.setLastError("Сайта не существует");
                     site.setStatus(SiteStatus.FAILED);
@@ -68,15 +68,13 @@ public class MappingService extends RecursiveTask<Page> {
                     return null;
                 }
 
-                mappers.addAll(addTreads(mappers, response));
-
+                mappers = addTreads(mappers, response);
                 page.set(addPage(url, response));
             } catch (HttpStatusException e) {
                 addErrorPage(e.getUrl(), e.getStatusCode());
-                return null;
             }
         } catch (IOException e) {
-
+            Thread.currentThread().interrupt();
         }
 
 
@@ -100,8 +98,8 @@ public class MappingService extends RecursiveTask<Page> {
                 break;
             }
             String currentUrl = elements.get(i).absUrl("href");
-            if (!currentUrl.isEmpty() && currentUrl.startsWith(url) && !links.contains(currentUrl) && !currentUrl
-                    .contains("#") && (!currentUrl.contains(".pdf"))) {
+            currentUrl = currentUrl.charAt(currentUrl.length() - 1) == '/' ? currentUrl.substring(0, currentUrl.length() - 1) : currentUrl;
+            if (!currentUrl.isEmpty() && currentUrl.startsWith(url) && !links.contains(currentUrl) && (!currentUrl.contains(".pdf"))) {
                 MappingService linkExecutor = new MappingService(currentUrl,site);
                 linkExecutor.fork();
                 mappers.add(linkExecutor);
@@ -114,9 +112,6 @@ public class MappingService extends RecursiveTask<Page> {
 
 
     private Page addPage(String url, Connection.Response response) throws IOException {
-        if (isStopped.get()){
-            return null;
-        }
         String mainUrl = site.getUrl();
         url = StringUtils.substring(url, 0,  url.charAt(url.length() - 1) == '/' ? url.length() - 1 : url.length());
         Page page = new Page();
@@ -146,24 +141,29 @@ public class MappingService extends RecursiveTask<Page> {
     }
 
     private void addLemmasAndIndexes(String html, Page page) throws IOException {
-        HashMap<String, Integer> pageLemmas = LemmaService.lemmasFromText(html);
-        for(Map.Entry<String, Integer> entry : pageLemmas.entrySet()) {
-            if (isStopped.get()) {
-                break;
+        try {
+            HashMap<String, Integer> pageLemmas = LemmaService.lemmasFromText(html);
+            for (Map.Entry<String, Integer> entry : pageLemmas.entrySet()) {
+                try {
+                    if (!lemmas.contains(entry.getKey())) {
+                        createAndSaveLemma(entry.getKey());
+                    } else if (lemmas.contains(entry.getKey()) && lemmaRepository.findByNameAndSite(entry.getKey(), site.getId()) != null) {
+                        lemmaRepository.addFrequency(entry.getKey(), site.getId());
+                    } else {
+                        createAndSaveLemma(entry.getKey());
+                    }
+                    Lemma lemma = lemmaRepository.findByNameAndSite(entry.getKey(), site.getId());
+                    Index index = new Index();
+                    index.setPage(page);
+                    index.setLemma(lemma);
+                    index.setRank(entry.getValue());
+                    indexRepository.save(index);
+                } catch (Exception e){
+
+                }
             }
-            if (!lemmas.contains(entry.getKey())){
-                createAndSaveLemma(entry.getKey());
-            } else if (lemmas.contains(entry.getKey()) && lemmaRepository.findByNameAndSite(entry.getKey(), site.getId()) != null){
-                lemmaRepository.addFrequency(entry.getKey(), site.getId());
-            } else {
-                createAndSaveLemma(entry.getKey());
-            }
-            Lemma lemma = lemmaRepository.findByNameAndSite(entry.getKey(), site.getId());
-            Index index = new Index();
-            index.setPage(page);
-            index.setLemma(lemma);
-            index.setRank(entry.getValue());
-            indexRepository.save(index);
+        } catch (Exception e){
+
         }
     }
 
