@@ -144,6 +144,9 @@ public class MappingService extends RecursiveTask<Page> {
         try {
             HashMap<String, Integer> pageLemmas = LemmaService.lemmasFromText(html);
             for (Map.Entry<String, Integer> entry : pageLemmas.entrySet()) {
+                if (isStopped.get()){
+                    return;
+                }
                 try {
                     if (!lemmas.contains(entry.getKey())) {
                         createAndSaveLemma(entry.getKey());
