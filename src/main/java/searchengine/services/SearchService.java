@@ -7,9 +7,9 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.stereotype.Service;
 import searchengine.dao.LemmaDao;
-import searchengine.dto.statistics.ErrorResponse;
 import searchengine.dto.statistics.SearchEntity;
 import searchengine.dto.statistics.SearchResponse;
+import searchengine.exception.SearchServiceException;
 import searchengine.model.Index;
 import searchengine.model.Lemma;
 import searchengine.model.Page;
@@ -25,18 +25,18 @@ public class SearchService {
     private final static LemmaDao lemmaRepository = new LemmaDao();
     private final SearchResponse searchResponse = new SearchResponse();
 
-    public Object search(String query, int siteId, int offset, int limit) throws IOException {
+    public SearchResponse search(String query, int siteId, int offset, int limit) throws IOException {
 
-        if (query.isEmpty()){
-            ErrorResponse response = new ErrorResponse("Задан пустой поисковой индекс");
-            return response;
+        try{
+            query.isEmpty();
+        } catch (Exception e){
+            throw new SearchServiceException("Задан пустой поисковой индекс");
         }
         List<Lemma> lemmas;
         try {
             lemmas = getLemmasFromSite(query, siteId);
         }catch (Exception e){
-            ErrorResponse response = new ErrorResponse("Запрос введен некорректно");
-            return response;
+            throw new SearchServiceException("Запрос введен некорректно");
         }
 
 
@@ -44,16 +44,14 @@ public class SearchService {
         try {
             pagesAndRelevance = getPagesAndRelevance(lemmas);
         } catch (ArrayIndexOutOfBoundsException e){
-            ErrorResponse response = new ErrorResponse("Не найдено совпадений");
-            return response;
+            throw new SearchServiceException("Не найдено совпаденний");
         }
 
         List<SearchEntity> data = new ArrayList<>();
         try {
             data = getDataForResponse(pagesAndRelevance, lemmas);
         } catch (NullPointerException e){
-            ErrorResponse response = new ErrorResponse("Не найдено совпадений");
-            return response;
+            throw new SearchServiceException("Не найдено совпаденний");
         }
 
 

@@ -150,4 +150,16 @@ public class PageDao implements DaoInterface<Page, Integer>{
         }
     }
 
+    public void deleteAllByPath(String path){
+        Session session = HibernateUtil.getSession();
+        Transaction tx = session.beginTransaction();
+        try{
+            Query query = session.createQuery("delete from Page where path like '%" + path + "%'");
+            query.executeUpdate();
+        } finally {
+            tx.commit();
+            session.close();
+        }
+    }
+
 }

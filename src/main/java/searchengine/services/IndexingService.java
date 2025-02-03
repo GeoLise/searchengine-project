@@ -10,8 +10,8 @@ import searchengine.dao.IndexDao;
 import searchengine.dao.LemmaDao;
 import searchengine.dao.PageDao;
 import searchengine.dao.SiteDao;
-import searchengine.dto.statistics.ErrorResponse;
 import searchengine.dto.statistics.Response;
+import searchengine.exception.SearchServiceException;
 import searchengine.model.Page;
 import searchengine.model.SiteStatus;
 
@@ -35,11 +35,11 @@ public class IndexingService {
     private final LemmaDao lemmaRepository;
     private final IndexDao indexRepository;
 
-    List<MappingService> services = new ArrayList<>();
+    private List<MappingService> services = new ArrayList<>();
 
-    public Object startIndexing(){
+    public Response startIndexing(){
         if (inProcess){
-            return new ErrorResponse("Индексация уже запущена");
+            throw new SearchServiceException("Индексация уже запущена");
         }
 
         process();
@@ -92,11 +92,11 @@ public class IndexingService {
     }
 
 
-    public Object stop() {
+    public Response stop() {
         services.forEach(MappingService::clearData);
         services.clear();
         if (!inProcess){
-            return new ErrorResponse("Индексация не запущена");
+            throw new SearchServiceException("Индексация не запущена");
         }
         inProcess = false;
         MappingService.setIsStopped(true);
@@ -122,7 +122,7 @@ public class IndexingService {
 
 
 
-    public Object indexPage(String url){
+    public Response indexPage(String url){
 
         process();
         boolean pageIsInSite = false;
@@ -132,7 +132,7 @@ public class IndexingService {
             }
         }
         if (!pageIsInSite) {
-            return new ErrorResponse("Данная страница находится за пределами сайтов, указанных в конфигурационном файле");
+            throw new SearchServiceException("Данная страница находится за пределами сайтов, указанных в конфигурационном файле");
         }
         String path = url.replace("https://", "").replace("http://", "");
         if (url.charAt(url.length() - 1) != '/'){
@@ -155,16 +155,9 @@ public class IndexingService {
             site.setLastError(null);
         }
         site.setStatus(SiteStatus.INDEXING);
-        List<Page> pages = pageRepository.findBySiteId(site.getId());
-        if (!pages.isEmpty()) {
-            for (Page page : pages) {
-                if (page.getPath().startsWith(path)) {
-                    try {
-                        pageRepository.delete(page);
-                    } catch (Exception e){}
-                }
-            }
-        }
+
+        pageRepository.deleteAllByPath(path);
+
         searchengine.model.Site currentSite = site;
         ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
         executor.submit(() -> {

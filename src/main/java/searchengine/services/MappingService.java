@@ -55,7 +55,6 @@ public class MappingService extends RecursiveTask<Page> {
         AtomicReference<Page> page = new AtomicReference<>(new Page());
         List<Page> pageList = new ArrayList<>();
         List<MappingService> mappers = new CopyOnWriteArrayList<>();
-        try {
             try {
                 Connection.Response response;
                 try {
@@ -72,10 +71,9 @@ public class MappingService extends RecursiveTask<Page> {
                 page.set(addPage(url, response));
             } catch (HttpStatusException e) {
                 addErrorPage(e.getUrl(), e.getStatusCode());
+            } catch (IOException e){
+                Thread.currentThread().interrupt();
             }
-        } catch (IOException e) {
-            Thread.currentThread().interrupt();
-        }
 
 
         mappers.sort(Comparator.comparing((MappingService o) -> o.url));
@@ -141,7 +139,6 @@ public class MappingService extends RecursiveTask<Page> {
     }
 
     private void addLemmasAndIndexes(String html, Page page) throws IOException {
-        try {
             HashMap<String, Integer> pageLemmas = LemmaService.lemmasFromText(html);
             for (Map.Entry<String, Integer> entry : pageLemmas.entrySet()) {
                 if (isStopped.get()){
@@ -165,9 +162,6 @@ public class MappingService extends RecursiveTask<Page> {
 
                 }
             }
-        } catch (Exception e){
-
-        }
     }
 
     private void createAndSaveLemma(String stringLemma){
