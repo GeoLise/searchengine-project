@@ -12,7 +12,6 @@ import searchengine.dao.PageDao;
 import searchengine.dao.SiteDao;
 import searchengine.dto.statistics.Response;
 import searchengine.exception.SearchServiceException;
-import searchengine.model.Page;
 import searchengine.model.SiteStatus;
 
 import java.time.LocalDateTime;
@@ -29,6 +28,9 @@ public class IndexingService {
 
     @Getter
     private static boolean inProcess = false;
+
+    private int indexedSites;
+
     private final SitesList sites;
     private final SiteDao siteRepository;
     private final PageDao pageRepository;
@@ -53,8 +55,11 @@ public class IndexingService {
 
         ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
+        indexedSites = 0;
+
+        List<searchengine.model.Site> sitesToIndex = new ArrayList<>();
+
         for (Site configSite : sitesList) {
-            executor.submit(() -> {
                 String url = configSite.getUrl();
                 String siteName = url.replace("https://", "").replace("http://", "").replace("/", "");
                 if (url.charAt(url.length() - 1) == '/'){
@@ -66,33 +71,44 @@ public class IndexingService {
                 site.setStatus(SiteStatus.INDEXING);
                 site.setStatusTime(LocalDateTime.now());
                 site.setUrl(url);
-                mapper(url, site);
-            });
+                sitesToIndex.add(site);
+                siteRepository.saveOrUpdate(site);
         }
+        executor.submit(() -> {
+            mapper(sitesToIndex);
+        });
+
         executor.shutdown();
         return new Response();
     }
 
 
 
-    private void mapper(String url, searchengine.model.Site site){
-        siteRepository.saveOrUpdate(site);
-        MappingService service = new MappingService(url, site);
-        services.add(service);
-        new ForkJoinPool().invoke(service);
-        site = service.getSite();
-        if (site.getStatus() == SiteStatus.FAILED){
-            return;
-        }
-        else if (inProcess) {
-            site.setStatus(SiteStatus.INDEXED);
-            siteRepository.update(site);
-        }
-        inProcess = false;
+    private void mapper(List<searchengine.model.Site> sitesToIndex){
+        sitesToIndex.forEach(site -> {
+            MappingService service = new MappingService(site.getUrl(), site);
+            services.add(service);
+            new ForkJoinPool().invoke(service);
+            site = service.getSite();
+            if (site.getStatus() == SiteStatus.FAILED){
+                indexedSites+=1;
+                return;
+            }
+            else if(inProcess) {
+                indexedSites+=1;
+                site.setStatus(SiteStatus.INDEXED);
+                siteRepository.update(site);
+            }
+            if (indexedSites == sites.getSites().size()){
+                inProcess = false;
+            }
+        });
+
     }
 
 
     public Response stop() {
+        System.out.println(indexedSites);
         services.forEach(MappingService::clearData);
         services.clear();
         if (!inProcess){
@@ -160,8 +176,10 @@ public class IndexingService {
 
         searchengine.model.Site currentSite = site;
         ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+        List<searchengine.model.Site> sitesToIndex = new ArrayList<>();
+        sitesToIndex.add(currentSite);
         executor.submit(() -> {
-            mapper(url, currentSite);
+            mapper(sitesToIndex);
         });
         executor.shutdown();
         return new Response();

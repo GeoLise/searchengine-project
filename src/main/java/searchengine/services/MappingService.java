@@ -70,7 +70,7 @@ public class MappingService extends RecursiveTask<Page> {
                 mappers = addTreads(mappers, response);
                 page.set(addPage(url, response));
             } catch (HttpStatusException e) {
-                addErrorPage(e.getUrl(), e.getStatusCode());
+                page.set(addErrorPage(e.getUrl(), e.getStatusCode()));
             } catch (IOException e){
                 Thread.currentThread().interrupt();
             }
@@ -91,14 +91,17 @@ public class MappingService extends RecursiveTask<Page> {
         }
         Document document = response.parse();
         Elements elements = document.select("a[href]");
-        for (int i = 0; i<elements.size(); i++){
+        for (org.jsoup.nodes.Element element : elements) {
+            if (!element.attr("href").startsWith("/")){
+                continue;
+            }
             if (isStopped.get()) {
                 break;
             }
-            String currentUrl = elements.get(i).absUrl("href");
+            String currentUrl = element.absUrl("href");
             currentUrl = currentUrl.charAt(currentUrl.length() - 1) == '/' ? currentUrl.substring(0, currentUrl.length() - 1) : currentUrl;
             if (!currentUrl.isEmpty() && currentUrl.startsWith(url) && !links.contains(currentUrl) && (!currentUrl.contains(".pdf"))) {
-                MappingService linkExecutor = new MappingService(currentUrl,site);
+                MappingService linkExecutor = new MappingService(currentUrl, site);
                 linkExecutor.fork();
                 mappers.add(linkExecutor);
                 links.add(currentUrl);
@@ -172,7 +175,6 @@ public class MappingService extends RecursiveTask<Page> {
         lemma.setLemma(stringLemma);
         lemmaRepository.save(lemma);
     }
-
 
 
     public Site getSite(){
