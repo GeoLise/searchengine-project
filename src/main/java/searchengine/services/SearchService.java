@@ -32,9 +32,9 @@ public class SearchService {
         } catch (Exception e){
             throw new SearchServiceException("Задан пустой поисковой индекс");
         }
-        List<Lemma> lemmas;
+        HashMap<Integer, List<Lemma>> siteLemmasMap;
         try {
-            lemmas = getLemmasFromSite(query, siteId);
+            siteLemmasMap = getLemmasFromSite(query, siteId);
         }catch (Exception e){
             throw new SearchServiceException("Запрос введен некорректно");
         }
@@ -42,15 +42,16 @@ public class SearchService {
 
         Map<Page, Double> pagesAndRelevance = new HashMap<>();
         try {
-            pagesAndRelevance = getPagesAndRelevance(lemmas);
+            pagesAndRelevance = getPagesAndRelevance(siteLemmasMap);
         } catch (ArrayIndexOutOfBoundsException e){
             throw new SearchServiceException("Не найдено совпаденний");
         }
 
         List<SearchEntity> data = new ArrayList<>();
         try {
-            data = getDataForResponse(pagesAndRelevance, lemmas);
+            data = getDataForResponse(pagesAndRelevance, siteLemmasMap);
         } catch (NullPointerException e){
+            System.out.println(e);
             throw new SearchServiceException("Не найдено совпаденний");
         }
 
@@ -73,40 +74,66 @@ public class SearchService {
     }
 
 
-    private List<Lemma> getLemmasFromSite(String query, int siteId) throws IOException {
+    private HashMap<Integer, List<Lemma>> getLemmasFromSite(String query, int siteId) throws IOException {
         HashMap<String, Integer> lemmaMap = LemmaService.lemmasFromText(query);
-        List<Lemma> lemmas = new ArrayList<>();
+
+        HashMap<Integer, List<Lemma>> siteLemmaMap = new HashMap<>();
         if (siteId != 0) {
+            List<Lemma> lemmas = new ArrayList<>();
+            int currentSiteId = 0;
             for (Map.Entry<String, Integer> entry : lemmaMap.entrySet()) {
                     Lemma lemma = lemmaRepository.findByNameAndSite(entry.getKey(), siteId);
+                    currentSiteId = lemma.getSite().getId();
                 if (lemma.getFrequency() <= 20) {
                     lemmas.add(lemma);
                 }
             }
+            lemmas = lemmas.stream().sorted(Comparator.comparingInt(Lemma::getFrequency)).toList();
+            siteLemmaMap.put(currentSiteId, lemmas);
         } else {
+            int currentSiteId = 0;
             for (Map.Entry<String, Integer> entry : lemmaMap.entrySet()){
                 List<Lemma> resultList = lemmaRepository.findByName(entry.getKey());
                 for(Lemma lemma : resultList){
-                    if (lemma.getFrequency() <= 20){
-                        lemmas.addAll(resultList);
+                    currentSiteId = lemma.getSite().getId();
+                    if (lemma.getFrequency() <= 20 && !siteLemmaMap.containsKey(currentSiteId)){
+                        List<Lemma> lemmas = new ArrayList<>();
+                        lemmas.add(lemma);
+                        siteLemmaMap.put(currentSiteId, lemmas);
+                    } else if(lemma.getFrequency() <= 20 && siteLemmaMap.containsKey(currentSiteId)){
+                        List<Lemma> lemmas = siteLemmaMap.get(currentSiteId);
+                        lemmas.add(lemma);
+                        siteLemmaMap.put(currentSiteId, lemmas);
                     }
                 }
             }
+            siteLemmaMap.replaceAll((k, v) -> v.stream().sorted(Comparator.comparingInt(Lemma::getFrequency)).toList());
         }
-        lemmas = lemmas.stream().sorted(Comparator.comparingInt(Lemma::getFrequency)).toList();
-        return lemmas;
+        return siteLemmaMap;
     }
 
 
-    private Map<Page, Double> getPagesAndRelevance(List<Lemma> lemmas){
-        List<Page> pages = lemmaRepository.getPages(lemmas.get(0));
-        for (Lemma lemma : lemmas){
-            List<Page> lemmaPages = lemmaRepository.getPages(lemma);
-            pages.retainAll(lemmaPages);
+    private Map<Page, Double> getPagesAndRelevance(HashMap<Integer, List<Lemma>> siteLemmasMap){
+
+        List<Page> pages = new ArrayList<>();
+
+        List<Lemma> lemmas = new ArrayList<>();
+
+        for(Map.Entry<Integer, List<Lemma>> entry : siteLemmasMap.entrySet()){
+            List<Page> currentSitePages = lemmaRepository.getPages(entry.getValue().get(0));
+            for (Lemma lemma : entry.getValue()){
+                lemmas.add(lemma);
+                List<Page> lemmaPages = lemmaRepository.getPages(lemma);
+                currentSitePages.retainAll(lemmaPages);
+            }
+            pages.addAll(currentSitePages);
         }
         if (pages.isEmpty()){
             return null;
         }
+
+
+
         Map<Page, Double> absRelMap = new HashMap<>();
         int count = 0;
         for (Page page : pages){
@@ -133,11 +160,14 @@ public class SearchService {
         return sortedMap;
     }
 
-    private List<SearchEntity> getDataForResponse(Map<Page, Double> sortedMap, List<Lemma> lemmas){
+    private List<SearchEntity> getDataForResponse(Map<Page, Double> sortedMap, HashMap<Integer, List<Lemma>> siteLemmasMap){
         List<SearchEntity> data = new ArrayList<>();
-        List<String> stringLemmas = lemmas.stream()
+
+        List<String> stringLemmas = siteLemmasMap.values().stream()
+                .flatMap(List::stream)
                 .map(Lemma::getLemma)
                 .toList();
+
         for(Map.Entry<Page, Double> entry : sortedMap.entrySet()){
             String snippet = "";
             Page page = entry.getKey();
