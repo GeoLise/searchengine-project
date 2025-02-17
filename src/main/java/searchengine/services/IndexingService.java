@@ -100,7 +100,7 @@ public class IndexingService {
                 siteRepository.update(site);
             }
             if (indexedSites == sites.getSites().size()){
-                inProcess = false;
+                stop();
             }
         });
 

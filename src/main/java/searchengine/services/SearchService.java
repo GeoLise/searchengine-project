@@ -51,7 +51,6 @@ public class SearchService {
         try {
             data = getDataForResponse(pagesAndRelevance, siteLemmasMap);
         } catch (NullPointerException e){
-            System.out.println(e);
             throw new SearchServiceException("Не найдено совпаденний");
         }
 
